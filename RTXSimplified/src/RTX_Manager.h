@@ -29,6 +29,11 @@ namespace RTXSimplified
 	class RTX_Manager
 	{
 	private:
+		// Entity -> Renderer, Coll
+		// cant use entity, library sys is different
+		// potentially offer both options
+		// entity poss with ID
+
 		bool initialized; ///< Flag that checks if everything has been initialized.
 		bool rtxSupported; ///< Flag that checks if RTX is supported.
 
@@ -41,7 +46,7 @@ namespace RTXSimplified
 		std::vector<std::pair<ComPtr<ID3D12Resource>, DirectX::XMMATRIX>> instances; ///< Stores references to top level acceleration structures.
 		ComPtr<ID3D12Resource> outputResource; ///< Stores the raytraced output.
 		ComPtr<ID3D12Resource> srvUAVHeap; ///< Used to create the shader resource heap.
-		ComPtr<ID3D12Resource> sbtStorage; ///< Stores the shader binding table.
+		ComPtr<ID3D12Resource> sbtStorage; ///< Stores the shader binding table (where the shader resources are bound to shaders).
 	public:
 		int initialize(); ///< Initializes the library, uses the initializer class.
 		void quit(); ///< Terminates the library, frees all memory.
