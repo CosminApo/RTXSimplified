@@ -41,12 +41,16 @@ namespace RTXSimplified
 		std::shared_ptr<RTX_PathTracer> pathTracer; ///< Class responsible for tracing rays path.
 		std::shared_ptr<RTX_Denoiser> denoiser;  ///< Class responsible for denoising the output.
 		std::shared_ptr<RTX_Initializer> initializer;  ///< Class responsible for initializing the library.
+		HWND hwnd; ///< Handle to the output window.
 
 		ComPtr<ID3D12Resource> bottomLevelAS; ///< Stores a reference to the bottom level acceleration structure.
 		std::vector<std::pair<ComPtr<ID3D12Resource>, DirectX::XMMATRIX>> instances; ///< Stores references to top level acceleration structures.
 		ComPtr<ID3D12Resource> outputResource; ///< Stores the raytraced output.
 		ComPtr<ID3D12Resource> srvUAVHeap; ///< Used to create the shader resource heap.
 		ComPtr<ID3D12Resource> sbtStorage; ///< Stores the shader binding table (where the shader resources are bound to shaders).
+		std::weak_ptr<RTX_Manager> self; ///< Smart "this" pointer.
+
+
 	public:
 		int initialize(); ///< Initializes the library, uses the initializer class.
 		void quit(); ///< Terminates the library, frees all memory.
@@ -57,6 +61,7 @@ namespace RTXSimplified
 		std::shared_ptr<RTX_PathTracer> getPathTracer();
 		std::shared_ptr<RTX_Denoiser> getDenoiser();
 		std::shared_ptr<RTX_Initializer> getInitializer();
+		HWND getHWND();
 	};
 }
 

@@ -1,21 +1,30 @@
 #include "RTX_Initializer.h"
 #include "RTX_Exception.h"
-
+#include "RTX_Manager.h"
 
 
 namespace RTXSimplified
 {
+void RTX_Initializer::setViewPortHeight(int _height)
+{
+	viewPort_height = _height;
+}
+void RTX_Initializer::setViewPortWidth(int _width)
+{
+	viewPort_width = _width;
+}
+
+#pragma region RTX_SUPPORT_CHECK
 	int RTX_Initializer::createDevice()
 	{
 		HRESULT hr; // Error handling
 		UINT dxgiFactoryFlags = 0; // Stores flags for creating factory
-		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG; // Enable additional debug layers
-		ComPtr<IDXGIFactory4> factory; // Interface for creating DXGI objects
+		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG; // Enable additional debug layers		
 		ComPtr<IDXGIAdapter1> hardwareAdapter; // Represents a GPU
 
 		hr = CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)); // Create the factory
 		RTX_Exception::handleError(&hr, "Failed to create factory"); // Error handling
-		
+
 		getAdapter(factory.Get(), &hardwareAdapter); // Get the GPU
 
 		hr = D3D12CreateDevice(			// Creates the device:
@@ -76,4 +85,67 @@ namespace RTXSimplified
 	{
 		return rtxSupported;
 	}
+
+#pragma endregion
+
+#pragma region RTX_PIPELINE
+
+	int RTX_Initializer::createCommandQueue()
+	{
+		HRESULT hr; // Error handling
+
+		D3D12_COMMAND_QUEUE_DESC queueDesc = {}; // Descriptor containing info about the command queue.
+		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE; // Set no flags for now. Swap to disable GPU timeout.
+		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT; // Type of command list. Direct is default. https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_command_list_type
+
+		hr = rtxDevice->CreateCommandQueue(		// Create a command queue
+			&queueDesc,							// With that descriptor
+			IID_PPV_ARGS(&commandQueue)),		// And store it here
+
+		RTX_Exception::handleError(&hr, "Error creating command queue"); // Handle errors	
+
+
+		return 0;
+	}
+
+	int RTX_Initializer::createSwapChain()
+	{
+		HRESULT hr; // Error handling
+
+		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {}; // Descriptor for the swap chain.
+		swapChainDesc.BufferCount = 2;								// Store 2 buffers by default.
+		swapChainDesc.Width = viewPort_width;						// with the height of the viewport
+		swapChainDesc.Height = viewPort_height;						// and the width of the viewport
+		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;			// on a standard rgb format
+		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;	// and transition by discarding
+		swapChainDesc.SampleDesc.Count = 1;							// 1 sample per pixel.
+
+		ComPtr<IDXGISwapChain1> swapChain1; // Temp.
+		hr = factory->CreateSwapChainForHwnd(		// Create a new swap chain
+			commandQueue.Get(),						// based on this queue
+			rtxManager->getHWND(),					// on this window
+			&swapChainDesc,							// using info from this descriptor
+			nullptr,								// no additional full screen descriptor
+			nullptr,								// no restriction on output
+			&swapChain1								// and store the result
+			);
+		RTX_Exception::handleError(&hr, "Error creating swap chain"); // Handle errors	
+
+		swapChain1.As(&swapChain); // Store the swap chain.
+		frameIndex = swapChain->GetCurrentBackBufferIndex(); // Store the current frame index.
+
+		return 0;
+	}
+
+	int RTX_Initializer::createPipeline()
+	{
+		createCommandQueue();
+		return 0;
+	}
+
+#pragma endregion
+
+
+
+
 }
