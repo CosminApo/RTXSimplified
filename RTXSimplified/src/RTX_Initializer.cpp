@@ -14,6 +14,16 @@ void RTX_Initializer::setViewPortWidth(int _width)
 	viewPort_width = _width;
 }
 
+void RTX_Initializer::setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager)
+{
+	rtxManager = _rtxManager;
+}
+
+ComPtr<ID3D12Device5> RTX_Initializer::getRTXDevice()
+{
+	return rtxDevice;
+}
+
 #pragma region RTX_SUPPORT_CHECK
 	int RTX_Initializer::createDevice()
 	{
@@ -86,6 +96,7 @@ void RTX_Initializer::setViewPortWidth(int _width)
 		return rtxSupported;
 	}
 
+
 #pragma endregion
 
 #pragma region RTX_PIPELINE
@@ -137,9 +148,65 @@ void RTX_Initializer::setViewPortWidth(int _width)
 		return 0;
 	}
 
+	int RTX_Initializer::createDescriptorHeaps()
+	{
+		HRESULT hr; // Error handling
+
+		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {}; // Descriptor for creating the descriptor heap
+		rtvHeapDesc.NumDescriptors = 2;								// Set to 2 by default
+		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;			// the descriptor heap for the render-target view.
+		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;		// no extra flags
+
+		hr = rtxDevice->CreateDescriptorHeap(		// Create a new descriptor heap
+			&rtvHeapDesc,							// basd on this info
+			IID_PPV_ARGS(&descriptorHeap));			// and store it here
+
+		RTX_Exception::handleError(&hr, "Error creating descriptor heap chain"); // Handle errors	
+
+		descriptorHeapSize = rtxDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV); // Store its size too
+
+		return 0;
+	}
+
+	int RTX_Initializer::createFrameResources()
+	{
+		HRESULT hr; // Error handling
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart()); // Create a new handle.
+		
+		for (int i = 0; i < 2; i++)
+		{
+			hr = swapChain->GetBuffer(				// Get buffer			
+				i,									// at this postion
+				IID_PPV_ARGS(&renderTargets[i])		// and store it here
+			);
+			RTX_Exception::handleError(&hr, "Error getting buffers"); // Handle errors	
+
+			rtxDevice->CreateRenderTargetView(			// Create a new render target view
+				renderTargets[i].Get(),					// from this render target
+				nullptr,								// a view that accesses all of the subresources in mipmap level 0
+				rtvHandle								// using this info
+			);
+			rtvHandle.Offset(1, descriptorHeapSize); // Ensure you get the next one
+		}
+
+		return 0;
+	}
+
 	int RTX_Initializer::createPipeline()
 	{
 		createCommandQueue();
+		createSwapChain();
+		createDescriptorHeaps();
+		createFrameResources();
+
+		HRESULT hr; // Error handling
+		hr = rtxDevice->CreateCommandAllocator(				// Create a new command allocator
+			D3D12_COMMAND_LIST_TYPE_DIRECT,					// a command allocator that the GPU can execute. A direct command list doesn't inherit any GPU state.
+			IID_PPV_ARGS(&commandAllocator)					// and store it here
+		);
+		RTX_Exception::handleError(&hr, "Error creating command allocator"); // Handle errors	
+
 		return 0;
 	}
 

@@ -52,7 +52,7 @@ namespace RTXSimplified
 
 
 	public:
-		int initialize(); ///< Initializes the library, uses the initializer class.
+		std::shared_ptr<RTX_Manager> initialize(); ///< Initializes the library, uses the initializer class.
 		void quit(); ///< Terminates the library, frees all memory.
 
 		/*GETTERS*/

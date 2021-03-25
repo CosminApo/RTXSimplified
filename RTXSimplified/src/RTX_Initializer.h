@@ -33,11 +33,17 @@ namespace RTXSimplified
 		int viewPort_height; ///< Stores properties for the viewport to output to.
 		std::shared_ptr<RTX_Manager> rtxManager; ///< Store a reference to the RTX manager class.
 		UINT frameIndex; ///< Used for synchronization.
+		ComPtr<ID3D12DescriptorHeap> descriptorHeap; ///< Collection of contiguos allocation of descriptors.
+		UINT descriptorHeapSize; ///< Stores the size of RTV heap descriptor.
+		ComPtr<ID3D12Resource> renderTargets[2]; ///< Stores RTV data for each frame.
+		ComPtr<ID3D12CommandAllocator> commandAllocator; ///< Allocations of storage for the GPU.
 
 		int createDevice(); ///< Creates the rtx device interface.
 		int getAdapter(IDXGIFactory2* _factory, IDXGIAdapter1** _adapter); ///< Gets the hardware adapter used to create the interface.
 		int createCommandQueue(); ///< Creates the command queue with set flags and type.
 		int createSwapChain(); ///< Creates the swap chain.
+		int createDescriptorHeaps(); ///< Creats the descriptor heap.
+		int createFrameResources(); ///< Creats RTV for each frame.
 
 	public:
 		int checkRTXSupport(); ///< Checks if the hardware supports RTX.
@@ -49,7 +55,7 @@ namespace RTXSimplified
 
 		/*GETTERS*/
 		bool getRTXsupported();
-	
+		ComPtr<ID3D12Device5> getRTXDevice();
 
 		/*SETTERS*/
 		void setViewPortHeight(int _height);
