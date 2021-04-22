@@ -6,6 +6,7 @@
 #include <dxgi1_4.h> // DXR
 #include <wrl.h> // Windows Runtime Library -> ComPtr
 #include <memory> // Smart pointers
+#include "RTX_Pipeline.h" // Pipeline generation
 
 using Microsoft::WRL::ComPtr; ///< Smart pointer for interfaces
 
@@ -37,6 +38,14 @@ namespace RTXSimplified
 		UINT descriptorHeapSize; ///< Stores the size of RTV heap descriptor.
 		ComPtr<ID3D12Resource> renderTargets[2]; ///< Stores RTV data for each frame.
 		ComPtr<ID3D12CommandAllocator> commandAllocator; ///< Allocations of storage for the GPU.
+		ComPtr<ID3D12StateObject> rtStateObject; ///< Stores the state of the pipeline.
+		ComPtr<ID3D12StateObject> rtStateObjectProps; ///< Stores the propertis of the state of the pipeline.
+		ComPtr<ID3D12GraphicsCommandList5> commandList; /*TBCCCCC*/
+		ComPtr<ID3D12Resource> vertexBuffer; /*TBCCCCC*/
+		HANDLE fenceEvent; /*TBCCCCC*/
+		ComPtr<ID3D12Fence> fence; /*TBCCCCC*/
+		UINT64 fenceValue = 0; /*TBCCCCC*/
+		ComPtr<ID3D12PipelineState> pipelineState; /*TBCCCCC*/
 
 		int createDevice(); ///< Creates the rtx device interface.
 		int getAdapter(IDXGIFactory2* _factory, IDXGIAdapter1** _adapter); ///< Gets the hardware adapter used to create the interface.
@@ -44,23 +53,34 @@ namespace RTXSimplified
 		int createSwapChain(); ///< Creates the swap chain.
 		int createDescriptorHeaps(); ///< Creats the descriptor heap.
 		int createFrameResources(); ///< Creats RTV for each frame.
+		int createCommandAllocator(); ///< Creates the command allocator.
 
 	public:
 		int checkRTXSupport(); ///< Checks if the hardware supports RTX.
 		int createPipeline(); ///< Creates the neccessary components for using DX12 DXR.
-		int createAccelerationStructures(); ///< Creates acceleration structure. Uses BVHmanager.
+	///	int createAccelerationStructures(); ///< Creates acceleration structure. Uses BVHmanager.
 		int createRaytracingPipeline(); ///< Creates RT pipeline.
 		int createShaderResourceHeap(); ///< Creates shader resource heap.
 		int createShaderBindingTable(); ///< Creates shader binding table.
 
+
 		/*GETTERS*/
 		bool getRTXsupported();
 		ComPtr<ID3D12Device5> getRTXDevice();
+		ComPtr<ID3D12GraphicsCommandList5> getCommandList();
+		ComPtr<ID3D12CommandQueue> getCommandQueue();
+		ComPtr<ID3D12CommandAllocator> getCommandAllocator();
+		ComPtr<ID3D12Resource> getVertexBuffer();
+		ComPtr<ID3D12Fence> getFence();
+		ComPtr<ID3D12PipelineState> getPipelineState();
+		UINT64 getFenceValue();
+		HANDLE getFenceEvent();
 
 		/*SETTERS*/
 		void setViewPortHeight(int _height);
 		void setViewPortWidth(int _width);
 		void setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager);
+		void setFenceValue(int _value);
 	};
 }
 

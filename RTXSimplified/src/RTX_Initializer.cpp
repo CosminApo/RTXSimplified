@@ -19,9 +19,54 @@ void RTX_Initializer::setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager)
 	rtxManager = _rtxManager;
 }
 
+void RTX_Initializer::setFenceValue(int _value)
+{
+	fenceValue = _value;
+}
+
 ComPtr<ID3D12Device5> RTX_Initializer::getRTXDevice()
 {
 	return rtxDevice;
+}
+
+ComPtr<ID3D12GraphicsCommandList5> RTX_Initializer::getCommandList()
+{
+	return commandList;
+}
+
+ComPtr<ID3D12CommandQueue> RTX_Initializer::getCommandQueue()
+{
+	return commandQueue;
+}
+
+ComPtr<ID3D12CommandAllocator> RTX_Initializer::getCommandAllocator()
+{
+	return commandAllocator;
+}
+
+ComPtr<ID3D12Resource> RTX_Initializer::getVertexBuffer()
+{
+	return vertexBuffer;
+}
+
+ComPtr<ID3D12Fence> RTX_Initializer::getFence()
+{
+	return fence;
+}
+
+ComPtr<ID3D12PipelineState> RTX_Initializer::getPipelineState()
+{
+	return pipelineState;
+}
+
+UINT64 RTX_Initializer::getFenceValue()
+{
+	return fenceValue;
+}
+
+HANDLE RTX_Initializer::getFenceEvent()
+{
+	return fenceEvent;
 }
 
 #pragma region RTX_SUPPORT_CHECK
@@ -193,13 +238,8 @@ ComPtr<ID3D12Device5> RTX_Initializer::getRTXDevice()
 		return 0;
 	}
 
-	int RTX_Initializer::createPipeline()
+	int RTX_Initializer::createCommandAllocator()
 	{
-		createCommandQueue();
-		createSwapChain();
-		createDescriptorHeaps();
-		createFrameResources();
-
 		HRESULT hr; // Error handling
 		hr = rtxDevice->CreateCommandAllocator(				// Create a new command allocator
 			D3D12_COMMAND_LIST_TYPE_DIRECT,					// a command allocator that the GPU can execute. A direct command list doesn't inherit any GPU state.
@@ -209,6 +249,44 @@ ComPtr<ID3D12Device5> RTX_Initializer::getRTXDevice()
 
 		return 0;
 	}
+
+	int RTX_Initializer::createRaytracingPipeline()
+	{
+		HRESULT hr; // Error handling
+		// Set up hierarchy.
+		std::shared_ptr<RTX_Pipeline> pipeline = std::make_shared<RTX_Pipeline>();
+		pipeline->setRTXManager(rtxManager);
+
+		pipeline->createDefaultRootSignature();
+		pipeline->createShaderLibraries();		 
+		pipeline->addLibraries();
+		pipeline->createShaderSignatures();
+		pipeline->addHitGroup(L"HitGroup", L"ClosestHit");
+		pipeline->addRootSignatureAssociation();
+		pipeline->setMaxPayloadSize(4 * sizeof(float)); // RGB + distance
+		pipeline->setMaxAttributeSize(2 * sizeof(float)); // XY
+		pipeline->setMaxRecusionDepth(1); // only primary rays for now
+		rtStateObject = pipeline->generate(); // Generate the pipeline
+		hr = rtStateObject->QueryInterface(IID_PPV_ARGS(&rtStateObjectProps)); // Generate the properties.
+
+		return 0;
+	}
+
+	int RTX_Initializer::createPipeline()
+	{
+		createCommandQueue();
+		createSwapChain();
+		createDescriptorHeaps();
+		createFrameResources();
+		createCommandAllocator();
+
+		///CREATE OCMMAND LIST
+
+
+		return 0;
+	}
+
+
 
 #pragma endregion
 

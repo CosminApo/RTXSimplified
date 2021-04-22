@@ -18,7 +18,7 @@ namespace RTXSimplified
 		uint32_t _indexCount,				// Number of indices in the buffer
 		ID3D12Resource* _transformBuffer,	// Contains 4x4 transform matrix
 		UINT64 _transformOffsetInBytes,		// Offset of the transform matrix
-		bool _isOpaque						// Used to optimize search for closes hit
+		bool _isOpaque						// Used to optimize search for c;loses hit
 	)
 	{
 		D3D12_RAYTRACING_GEOMETRY_DESC descriptor = {};										// Descriptor for input data
@@ -73,6 +73,57 @@ namespace RTXSimplified
 		// Store the data locally
 		scratchSize = *_scratchSizeInBytes;
 		resultSize = *_resultSizeInBytes;
+
+		return 0;
+	}
+
+	int RTX_BLAS::generate(
+		ID3D12GraphicsCommandList4* _commandList, // Command list to queue the generation to.
+		ID3D12Resource* _scratchBuffer,			 // Scratch buffer used. 
+		ID3D12Resource* _resultBuffer,			 // Stores the AS.
+		bool _updateOnly,						 // True = refit existing AS.
+		ID3D12Resource* _previousResult			 // Previous AS, used for iterative updates.
+	)
+	{
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS localFlags = flags; // Use the flags generated before to check if update or construct.
+		if (flags == D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE && _updateOnly)
+			flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+
+		/*ERROR CHECKS*/
+		// Check you're not trying to update on a non-updateable struct
+		if (flags != D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE && _updateOnly)
+		{
+			RTX_Exception::handleError("Trying to update a BLAS not built for updates.", true);
+		}
+		// Check if the previous BLAS was provided if you're trying to update
+		if (_updateOnly && _previousResult == nullptr)
+		{
+			RTX_Exception::handleError("Trying to update a BLAS but no previous BLAS provided.", true);
+		}
+		// Check if scratch and result size have been populated
+		if (resultSize == 0 || scratchSize == 0)
+		{
+			RTX_Exception::handleError("Invalid result / scratch size.", true);
+		}
+
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc;						// Descriptor storing info about the BLAS
+		buildDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;	// BLAS type
+		buildDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;							// Array layout
+		buildDesc.Inputs.NumDescs = static_cast<UINT>(vertexBuffers.size());				// number of descs based on vertex buffers amount
+		buildDesc.Inputs.pGeometryDescs = vertexBuffers.data();								// define the geometry
+		buildDesc.Inputs.Flags = flags;														// using the flags generated before
+		buildDesc.DestAccelerationStructureData = _resultBuffer->GetGPUVirtualAddress();	// get result buffer
+		buildDesc.SourceAccelerationStructureData = _scratchBuffer->GetGPUVirtualAddress();	// get scratch buffer
+		buildDesc.SourceAccelerationStructureData = _previousResult ? _previousResult->GetGPUVirtualAddress() : 0; // get previous BLAS if available
+
+		_commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr); // Build the AS
+
+		/*UAV barrier -> used to ensure this buffer is complete before moving on*/
+		D3D12_RESOURCE_BARRIER uavBarrier;						// Store info about the UAV barrier
+		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;		// type Unordered Access View
+		uavBarrier.UAV.pResource = _resultBuffer;				// wait for the result buffer
+		uavBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;	// no flags
+		_commandList->ResourceBarrier(1, &uavBarrier);			// build the barrier
 
 		return 0;
 	}

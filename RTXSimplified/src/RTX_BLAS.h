@@ -8,6 +8,7 @@
 #include <dxgi1_2.h> // DXR
 #include <stdint.h> // uint32_t
 #include <vector>
+#include "RTX_Exception.h" // Error handling
 
 // Helper to compute aligned buffer sizes
 #ifndef ROUND_UP
@@ -29,36 +30,42 @@ namespace RTXSimplified
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS flags; ///< Flags for the builder.
 
 		int addVertexBufferLimited(
-			ID3D12Resource* _vertexBuffer,		// Contains vertex coords
-			UINT64 _vertexOffsetInBytes,		// Offset of the first vertex
-			uint32_t _vertexCount,				// Number of vertices in the buffer
-			UINT _vertexSizeInBytes,			// Size of a vertex
-			ID3D12Resource* _indexBuffer,		// Contains all the vertx indices of triangls
-			UINT64 _indexOffsetInBytes,			// Offset to the first index
-			uint32_t _indexCount,				// Number of indices in the buffer
-			ID3D12Resource* _transformBuffer,	// Contains 4x4 transform matrix
-			UINT64 _transformOffsetInBytes,		// Offset of the transform matrix
-			bool _isOpaque						// Used to optimize search for closes hit
+			ID3D12Resource* _vertexBuffer,		///< Contains vertex coords.
+			UINT64 _vertexOffsetInBytes,		///< Offset of the first vertex.
+			uint32_t _vertexCount,				///< Number of vertices in the buffer.
+			UINT _vertexSizeInBytes,			///< Size of a vertex.
+			ID3D12Resource* _indexBuffer,		///< Contains all the vertx indices of triangls.
+			UINT64 _indexOffsetInBytes,			///< Offset to the first index.
+			uint32_t _indexCount,				///< Number of indices in the buffer.
+			ID3D12Resource* _transformBuffer,	///< Contains 4x4 transform matrix.
+			UINT64 _transformOffsetInBytes,		///< Offset of the transform matrix.
+			bool _isOpaque						///< Used to optimize search for closes hit.
 		); ///< Allocates the buffers on the GPU. This way, the API limits its use to triangles.
 		  
 	public:
-		int generate(); ///< Generates the BLAS.
+		int generate(
+			ID3D12GraphicsCommandList4* _commandList, ///< Command list to queue the generation to.
+			ID3D12Resource* _scratchBuffer,			 ///< Scratch buffer used. 
+			ID3D12Resource* _resultBuffer,			 ///< Stores the AS.
+			bool _updateOnly,						 ///< True = refit existing AS.
+			ID3D12Resource* _previousResult			 ///< Previous AS, used for iterative updates.
+		); ///< Generates the BLAS (queues it up on the command list).
 
 		int computeASBufferSize(
-			ID3D12Device5* _device,			    // Device on which the build will be performed
-			bool _allowUpdate,					// if true, allow iterative updates
-			UINT64* _scratchSizeInBytes,		// Temporary scratch memory
-			UINT64* _resultSizeInBytes			// Temporary result memory
+			ID3D12Device5* _device,			    ///< Device on which the build will be performed.
+			bool _allowUpdate,					///< if true, allow iterative updates.
+			UINT64* _scratchSizeInBytes,		///< Temporary scratch memory.
+			UINT64* _resultSizeInBytes			///< Temporary result memory.
 		); ///< Computes the size of the accelleration structure based on device and data.
 
 		int addVertexBuffer(
-			ID3D12Resource* _vertexBuffer,		// Contains vertex coords
-			UINT64 _vertexOffsetInBytes,		// Offset of the first vertex
-			uint32_t _vertexCount,				// Number of vertices in the buffer
-			UINT _vertexSizeInBytes,			// Size of a vertex
-			ID3D12Resource* _transformBuffer,	// Contains 4x4 transform matrix
-			UINT64 _transformOffsetInBytes,		// Offset of the transform matrix
-			bool _isOpaque						// Used to optimize search for closes hit
+			ID3D12Resource* _vertexBuffer,		///< Contains vertex coords.
+			UINT64 _vertexOffsetInBytes,		///< Offset of the first vertex.
+			uint32_t _vertexCount,				///< Number of vertices in the buffer.
+			UINT _vertexSizeInBytes,			///< Size of a vertex.
+			ID3D12Resource* _transformBuffer,	///< Contains 4x4 transform matrix.
+			UINT64 _transformOffsetInBytes,		///< Offset of the transform matrix.
+			bool _isOpaque						///< Used to optimize search for closes hit.
 		); ///< Allocates the buffers on the GPU.
 	};
 }

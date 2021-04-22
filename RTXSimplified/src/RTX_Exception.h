@@ -15,6 +15,7 @@ namespace RTXSimplified
 	{
 	public:
 		static void handleError(HRESULT* _hr, std::string _error); ///< Checks for error, displays custom message
+		static void handleError(std::string _error, bool _fatal); ///< Displays custom error message, stops program if needed.
 	private:
 	};
 }

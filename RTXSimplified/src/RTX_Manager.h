@@ -36,6 +36,10 @@ namespace RTXSimplified
 
 		bool initialized; ///< Flag that checks if everything has been initialized.
 		bool rtxSupported; ///< Flag that checks if RTX is supported.
+		std::string rayGenShader; ///< Stores the path to the ray generation shader.
+		std::string missShader;	  ///< Stores the path to the miss shader.
+		std::string hitShader;	  ///< Stores the path to the hit shader.
+
 
 		std::shared_ptr<RTX_BVHmanager> bvhManager; ///< Class responsible for managing BVH.
 		std::shared_ptr<RTX_PathTracer> pathTracer; ///< Class responsible for tracing rays path.
@@ -44,7 +48,6 @@ namespace RTXSimplified
 		HWND hwnd; ///< Handle to the output window.
 
 		ComPtr<ID3D12Resource> bottomLevelAS; ///< Stores a reference to the bottom level acceleration structure.
-		std::vector<std::pair<ComPtr<ID3D12Resource>, DirectX::XMMATRIX>> instances; ///< Stores references to top level acceleration structures.
 		ComPtr<ID3D12Resource> outputResource; ///< Stores the raytraced output.
 		ComPtr<ID3D12Resource> srvUAVHeap; ///< Used to create the shader resource heap.
 		ComPtr<ID3D12Resource> sbtStorage; ///< Stores the shader binding table (where the shader resources are bound to shaders).
@@ -52,7 +55,11 @@ namespace RTXSimplified
 
 
 	public:
-		std::shared_ptr<RTX_Manager> initialize(); ///< Initializes the library, uses the initializer class.
+		std::shared_ptr<RTX_Manager> initialize(
+			std::string _rayGenShader, ///< Path to the ray generation shader.
+			std::string _missShader,   ///< Path to the no hit shader.
+			std::string _hitShader	   ///< Path to the closest hit shader. 
+		); ///< Initializes the library, uses the initializer class.
 		void quit(); ///< Terminates the library, frees all memory.
 
 		/*GETTERS*/
@@ -61,6 +68,9 @@ namespace RTXSimplified
 		std::shared_ptr<RTX_PathTracer> getPathTracer();
 		std::shared_ptr<RTX_Denoiser> getDenoiser();
 		std::shared_ptr<RTX_Initializer> getInitializer();
+		std::string getRayGenShader();
+		std::string getMissShader();
+		std::string getHitShader();
 		HWND getHWND();
 	};
 }
