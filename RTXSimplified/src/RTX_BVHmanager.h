@@ -63,8 +63,12 @@ namespace RTXSimplified
 	public:
 		int createAccelerationStructure(); ///< Creates the acceleration structure.
 
+		/*GETTERS*/
+		AccelerationStructureBuffers getTLASBuffers();
+
 		/*SETTERS*/
 		void setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager);
+		
 
 	};
 }

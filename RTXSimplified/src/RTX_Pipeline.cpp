@@ -1,6 +1,7 @@
 #include "RTX_Pipeline.h"
 #include "RTX_Initializer.h"
 #include "RTX_Manager.h"
+#include "RTX_BVHmanager.h"
 #include <fstream>
 
 namespace RTXSimplified
@@ -22,11 +23,53 @@ namespace RTXSimplified
 		rootSigAssociations.emplace_back(RootSignatureAssociation(_rootSig, _symbols));
 		return 0;
 	}
+	ID3D12DescriptorHeap* RTX_Pipeline::createDescriptorHeap(uint32_t _count, D3D12_DESCRIPTOR_HEAP_TYPE _type, bool _shaderVisible)
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC descriptor = {}; // The descriptor for the desc heap.
+		/*Pass in parameters*/
+		descriptor.NumDescriptors = _count;
+		descriptor.Type = _type;
+		descriptor.Flags = _shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+		ID3D12DescriptorHeap* heap;
+		rtxManager->getInitializer()->getRTXDevice()->CreateDescriptorHeap(&descriptor, IID_PPV_ARGS(&heap)); // Create a new heap.
+
+		return heap;
+	}
+	ID3D12Resource* RTX_Pipeline::createBuffer(ID3D12Device* _device, uint64_t _size, D3D12_RESOURCE_FLAGS _flags, D3D12_RESOURCE_STATES _initState, const D3D12_HEAP_PROPERTIES& _heapProps)
+	{
+		HRESULT hr; // Error handling
+
+		D3D12_RESOURCE_DESC bufferDesc = {};						// Contains info about how to create the buffer:
+		bufferDesc.Alignment = 0;									// must be 64KB or 0 (which is default) for buffer
+		bufferDesc.DepthOrArraySize = 1;							// must be 1 for buffer
+		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;		// specify its a buffer
+		bufferDesc.Flags = _flags;									// D3D12_RESOURCE_FLAGS
+		bufferDesc.Format = DXGI_FORMAT_UNKNOWN;					// unknown format at this point
+		bufferDesc.Height = 1;										// must be 1 for buffer
+		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;			// must be for buffer
+		bufferDesc.MipLevels = 1;									// must be 1 for buffer
+		bufferDesc.SampleDesc.Count = 1;							// must be 1 for buffer
+		bufferDesc.SampleDesc.Quality = 0;							// must be 0 for buffer
+		bufferDesc.Width = _size;									// how long the memory block is
+
+		ID3D12Resource* buffer;
+		hr = rtxManager->getInitializer()->getRTXDevice().Get()->CreateCommittedResource( //Creates both a resource and an implicit heap and the resource is mapped to the heap
+			&_heapProps,					// D3D12_HEAP_PROPERTIES for the heap
+			D3D12_HEAP_FLAG_NONE,			// D3D12_HEAP_FLAGS for the heap
+			&bufferDesc,					// descriptor for buffer
+			_initState,						// D3D12_RESOURCE_STATES 
+			nullptr,						// dimension buffer needs nullptr
+			IID_PPV_ARGS(&buffer)			// store it here
+		);
+		RTX_Exception::handleError(&hr, "Error creating buffer"); // Handle errors	
+
+		return buffer;
+	}
 	int RTX_Pipeline::buildShaderExportList(std::vector<std::wstring>& _exportedSymbols)
 	{
 		std::unordered_set<std::wstring> exports; // Stores all the names from libs and hjitgroups
 		
-
 		/* Add all the libs */
 		for (const Library& lib : libraries)
 		{
@@ -410,6 +453,78 @@ namespace RTXSimplified
 		RTX_Exception::handleError(&hr, " Error creating the raytracing pipeline.");
 
 		return rtStateObject;
+	}
+	int RTX_Pipeline::createShaderResourceHeap()
+	{
+		srvUavHeap = createDescriptorHeap(				// Create new descriptor heaps
+			2,											// 2 of them
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,		// type SRV/UAV/CBV
+			true										// visible
+		);
+
+		// Get a handle for the srv
+		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = srvUavHeap->GetCPUDescriptorHandleForHeapStart();
+
+		// Create a UAV based on the output resource.
+		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		rtxManager->getInitializer()->getRTXDevice()->CreateUnorderedAccessView( // Create UAV
+			rtxManager->getInitializer()->getOutputResource().Get(),			 // using the output resource
+			nullptr,															 // no counter
+			&uavDesc,															 // use this desc
+			srvHandle															 // store here
+		);
+
+		// Increment the top level as SRV after the buffer
+		srvHandle.ptr += rtxManager->getInitializer()->getRTXDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;										// Create a desc for the SRV 
+		srvDesc.Format = DXGI_FORMAT_UNKNOWN;											// Unspecified format
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;  // AS dimension
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;		// default
+		srvDesc.RaytracingAccelerationStructure.Location =								// get the TLAS loc
+			rtxManager->getBVHManager()->getTLASBuffers().result->GetGPUVirtualAddress();
+		
+		rtxManager->getInitializer()->getRTXDevice()->CreateShaderResourceView(nullptr, &srvDesc, srvHandle); // Create the SRV
+
+		return 0;
+	}
+	int RTX_Pipeline::createShaderBindingTable()
+	{
+		SBTGenerator.reset(); // Reset all.
+
+		// Get the pointer at the beggining of the heap
+		D3D12_GPU_DESCRIPTOR_HANDLE srvUavHeapHandle = srvUavHeap->GetGPUDescriptorHandleForHeapStart();
+
+		// Reinterpret pointer cause DX12
+		auto heapPointer = reinterpret_cast<UINT64*>(srvUavHeapHandle.ptr);
+
+		// Add the ray gen program with its data.
+		SBTGenerator.addRayGenerationProgram(L"Raygen", { heapPointer });
+
+		// Add the miss and hit program which use no data.
+		SBTGenerator.addMissProgram(L"Miss", {});
+		SBTGenerator.addRayGenerationProgram(L"HitGroup", { (void*)(rtxManager->getInitializer()->getVertexBuffer()->GetGPUVirtualAddress()) });
+
+		// Calculate the size
+		uint32_t sbtsize = SBTGenerator.computeSBTSize();
+
+		sbtStorage = createBuffer(								// Create a new buffer
+			rtxManager->getInitializer()->getRTXDevice().Get(), // For this device
+			sbtsize,											// This big
+			D3D12_RESOURCE_FLAG_NONE,							// No flags
+			D3D12_RESOURCE_STATE_GENERIC_READ,					// Read state
+			uploadHeapProperties								// upload heap properties
+		);
+
+		if (!sbtStorage)
+		{
+			RTX_Exception::handleError("Error allocating the SBT.", true);
+		}
+		SBTGenerator.generate(sbtStorage.Get(), rtxManager->getInitializer()->getRTStateObjProperties().Get());
+			
+
+		return 0;
 	}
 	void RTX_Pipeline::setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager)
 	{

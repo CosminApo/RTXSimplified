@@ -39,7 +39,7 @@ namespace RTXSimplified
 		std::string rayGenShader; ///< Stores the path to the ray generation shader.
 		std::string missShader;	  ///< Stores the path to the miss shader.
 		std::string hitShader;	  ///< Stores the path to the hit shader.
-
+		int width, height; ///< Stores information about the output window size.
 
 		std::shared_ptr<RTX_BVHmanager> bvhManager; ///< Class responsible for managing BVH.
 		std::shared_ptr<RTX_PathTracer> pathTracer; ///< Class responsible for tracing rays path.
@@ -72,6 +72,13 @@ namespace RTXSimplified
 		std::string getMissShader();
 		std::string getHitShader();
 		HWND getHWND();
+		int getWidth();
+		int getHeight();
+
+
+		/*SETTERS*/
+		void setWidth(int _value);
+		void setHeight(int _value);
 	};
 }
 

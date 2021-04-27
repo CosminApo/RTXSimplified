@@ -5,6 +5,7 @@
 
 namespace RTXSimplified
 {
+
 void RTX_Initializer::setViewPortHeight(int _height)
 {
 	viewPort_height = _height;
@@ -67,6 +68,16 @@ UINT64 RTX_Initializer::getFenceValue()
 HANDLE RTX_Initializer::getFenceEvent()
 {
 	return fenceEvent;
+}
+
+ComPtr<ID3D12Resource> RTX_Initializer::getOutputResource()
+{
+	return outputResource;
+}
+
+ComPtr<ID3D12StateObjectProperties> RTX_Initializer::getRTStateObjProperties()
+{
+	return rtStateObjectProps;
 }
 
 #pragma region RTX_SUPPORT_CHECK
@@ -250,6 +261,37 @@ HANDLE RTX_Initializer::getFenceEvent()
 		return 0;
 	}
 
+	int RTX_Initializer::createRTOutput()
+	{
+		HRESULT hr; // Error checking
+		/*sanity check*/
+		if (rtxManager->getWidth() == 0 || rtxManager->getHeight() == 0)
+		{
+			RTX_Exception::handleError("Error creating the RT output buffer: height or width set to 0", false);
+		}
+
+		D3D12_RESOURCE_DESC resourceDesc = {};					   			// Descriptor for the RT output buffer:
+		resourceDesc.DepthOrArraySize = 1;									// size 1
+		resourceDesc.Alignment = D3D12_RESOURCE_DIMENSION_TEXTURE2D;		// output alligned same as a texture
+		resourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;					// RGB 8bit
+		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;	// no need to force ordered access
+		resourceDesc.Width = rtxManager->getWidth();						// use width of window
+		resourceDesc.Height = rtxManager->getHeight();						// use height of window
+		resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;					// layout as a texture
+		resourceDesc.MipLevels = 1;											// no mipmaps
+		resourceDesc.SampleDesc.Count = 1;									// 1 desc
+		hr = rtxDevice->CreateCommittedResource(		// Create a new commited resource
+			&defaultHeapProperties,						// using default properties
+			D3D12_HEAP_FLAG_NONE,						// no extra flags
+			&resourceDesc,								// using this descriptor
+			D3D12_RESOURCE_STATE_COPY_SOURCE,			// copy source
+			nullptr,									// must be nullptr for buffers
+			IID_PPV_ARGS(&outputResource)				// store it here
+		);
+
+		return 0;
+	}
+
 	int RTX_Initializer::createRaytracingPipeline()
 	{
 		HRESULT hr; // Error handling
@@ -268,6 +310,8 @@ HANDLE RTX_Initializer::getFenceEvent()
 		pipeline->setMaxRecusionDepth(1); // only primary rays for now
 		rtStateObject = pipeline->generate(); // Generate the pipeline
 		hr = rtStateObject->QueryInterface(IID_PPV_ARGS(&rtStateObjectProps)); // Generate the properties.
+		pipeline->createShaderResourceHeap();
+		pipeline->createShaderBindingTable();
 
 		return 0;
 	}
@@ -279,7 +323,7 @@ HANDLE RTX_Initializer::getFenceEvent()
 		createDescriptorHeaps();
 		createFrameResources();
 		createCommandAllocator();
-
+		createRTOutput();
 		///CREATE OCMMAND LIST
 
 

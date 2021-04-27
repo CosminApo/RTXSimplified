@@ -172,6 +172,10 @@ namespace RTXSimplified
 
 		return 0;
 	}
+	AccelerationStructureBuffers RTX_BVHmanager::getTLASBuffers()
+	{
+		return TLASBuffers;
+	}
 	void RTX_BVHmanager::setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager)
 	{
 		rtxManager = _rtxManager;

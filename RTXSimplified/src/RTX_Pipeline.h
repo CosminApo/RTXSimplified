@@ -13,6 +13,8 @@
 #include <unordered_set> // shader export list
 #include <tuple> // root sig
 #include <xhash> // shader export list
+#include "RTX_SBTGenerator.h" // SBTs 
+
 
 using Microsoft::WRL::ComPtr; ///< Smart pointer for interfaces
 
@@ -21,6 +23,7 @@ namespace RTXSimplified
 {
 	/*FORWARD DECLARES*/
 	class RTX_Manager;
+
 
 	/**
 	* \brief The class responsible for creating the raytracing pipeline. 
@@ -118,6 +121,9 @@ namespace RTXSimplified
 		ComPtr<ID3D12RootSignature> rayGenSignature; ///< Signature for the ray generation shader.
 		ComPtr<ID3D12RootSignature> hitSignature; ///< Signature for the hit shader.
 		ComPtr<ID3D12RootSignature> missSignature; ///< Signature for the miss shader.
+		ComPtr<ID3D12DescriptorHeap> srvUavHeap; ///< Stores the descriptor for the srv/uav/cbv heap.
+		RTX_SBTGenerator SBTGenerator; ///< Helps generate SBTs.
+		ComPtr<ID3D12Resource> sbtStorage; ///< Stores the SBT.
 
 		IDxcBlob* compileShaderLib(std::string _shaderFile); ///< Compiles the shader library.
 		std::wstring stringToWstring(std::string _s); ///< Converts an std::string to a std::wstring.
@@ -125,11 +131,19 @@ namespace RTXSimplified
 		ComPtr<ID3D12RootSignature> createRayGenSignature(); ///< Creates the signature for the ray generation shader.
 		ComPtr<ID3D12RootSignature> createMissSignature(); ///< Creates the signature for the ray miss shader.
 		ComPtr<ID3D12RootSignature> createHitSignature(); ///< Creates the signature for the ray hit shader.
+		int buildShaderExportList(std::vector<std::wstring>& _exportedSymbols); ///< Creats the shader export symbol list.
 		int addRootSignatureAssociation(
 			ID3D12RootSignature* _rootSig, ///< Signature of the shader.
 			const std::vector<std::wstring>& _symbols ///< Symbols associated
 		); ///< Adds a new root signature association.
-		int buildShaderExportList(std::vector<std::wstring>& _exportedSymbols); ///< Creats the shader export symbol list.
+		ID3D12DescriptorHeap* createDescriptorHeap(
+			uint32_t _count, ///< Number of descriptors.
+			D3D12_DESCRIPTOR_HEAP_TYPE _type, ///< Type of descriptors.
+			bool _shaderVisible ///< Is the shader visibe.
+		); ///< Creates a new shader descriptor heap.
+		ID3D12Resource* createBuffer(ID3D12Device* _device, uint64_t _size, D3D12_RESOURCE_FLAGS _flags,
+			D3D12_RESOURCE_STATES _initState, const D3D12_HEAP_PROPERTIES& _heapProps); ///< Creates a buffer based on the device properties, data properties and ctrl flags.
+
 	public:
 		int addHitGroup(
 			const std::wstring& _hitGroupName, ///< Name of the hit group.
@@ -144,6 +158,8 @@ namespace RTXSimplified
 		int addLibraries(); ///< Adds the raygen,  hit and miss libaries.
 		int createShaderSignatures(); ///< Creates the shader signatures.
 		ID3D12StateObject* generate(); ///< Generates the pipeline.
+		int createShaderResourceHeap(); ///< Creates shader resource heap.
+		int createShaderBindingTable(); ///< Creates shader binding table.
 
 		/*SETTERS*/
 		void setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager);

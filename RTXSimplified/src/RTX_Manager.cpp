@@ -38,6 +38,10 @@ namespace RTXSimplified
 
 		return rtn;
 	}
+	std::shared_ptr<RTX_BVHmanager> RTX_Manager::getBVHManager()
+	{
+		return bvhManager;
+	}
 	std::shared_ptr<RTX_Initializer> RTX_Manager::getInitializer()
 	{
 		return initializer;
@@ -57,5 +61,21 @@ namespace RTXSimplified
 	HWND RTX_Manager::getHWND()
 	{
 		return hwnd;
+	}
+	int RTX_Manager::getWidth()
+	{
+		return width;
+	}
+	int RTX_Manager::getHeight()
+	{
+		return height;
+	}
+	void RTX_Manager::setWidth(int _value)
+	{
+		width = _value;
+	}
+	void RTX_Manager::setHeight(int _value)
+	{
+		height = _value;
 	}
 }
