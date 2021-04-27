@@ -161,6 +161,11 @@ namespace RTXSimplified
 		int createShaderResourceHeap(); ///< Creates shader resource heap.
 		int createShaderBindingTable(); ///< Creates shader binding table.
 
+		/*GETTERS*/
+		ComPtr<ID3D12DescriptorHeap> getSrvUavHeap();
+		RTX_SBTGenerator getSBTGenerator();
+		ComPtr<ID3D12Resource> getSBTStorage();
+
 		/*SETTERS*/
 		void setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager);
 		void setMaxPayloadSize(UINT _value);

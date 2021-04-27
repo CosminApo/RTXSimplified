@@ -11,6 +11,8 @@ namespace RTXSimplified
 		rtn->initializer->setRTXManager(rtn);
 		rtn->bvhManager = std::make_shared<RTX_BVHmanager>();
 		rtn->bvhManager->setRTXManager(rtn);
+		rtn->pathTracer = std::make_shared<RTX_PathTracer>();
+		rtn->pathTracer->setRTXManager(rtn);
 
 		// Store values locally
 		hitShader = _hitShader;

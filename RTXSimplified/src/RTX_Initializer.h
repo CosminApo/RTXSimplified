@@ -24,6 +24,7 @@ namespace RTXSimplified
 	class RTX_Initializer
 	{
 	private:
+		std::shared_ptr<RTX_Pipeline> pipeline; ///< An instance for the pipeline generator class.
 		bool rtxSupported = false; ///< Flag to store whether device supports it.
 		ComPtr<ID3D12Device5> rtxDevice; ///< Interface for the GPU.
 		ComPtr<ID3D12CommandQueue> commandQueue; ///< Stores the command queue, which stores command lists to be executed.
@@ -41,6 +42,11 @@ namespace RTXSimplified
 		ComPtr<ID3D12StateObject> rtStateObject; ///< Stores the state of the pipeline.
 		ComPtr<ID3D12StateObjectProperties> rtStateObjectProps; ///< Stores the properties of the state of the pipeline.
 		ComPtr<ID3D12Resource> outputResource; ///< Stores the RT output.
+		ComPtr<ID3D12RootSignature> rootSignature; ///< Stores the root signature.
+		CD3DX12_VIEWPORT viewPort; ///< Stores the view port.
+		CD3DX12_RECT scissorRect; ///< Stores a rectangle.
+		ComPtr<ID3D12DescriptorHeap> rtvHeap; ///< Stores the heap for the rtv.
+
 		ComPtr<ID3D12GraphicsCommandList5> commandList; /*TBCCCCC*/
 		ComPtr<ID3D12Resource> vertexBuffer; /*TBCCCCC*/
 		HANDLE fenceEvent; /*TBCCCCC*/
@@ -78,6 +84,15 @@ namespace RTXSimplified
 		HANDLE getFenceEvent();
 		ComPtr<ID3D12Resource> getOutputResource();
 		ComPtr<ID3D12StateObjectProperties> getRTStateObjProperties();
+		ComPtr<ID3D12RootSignature> getRootSignature();
+		CD3DX12_VIEWPORT getViewPort();
+		CD3DX12_RECT getScissorRect();
+		ComPtr<ID3D12Resource> getRenderTarget();
+		ComPtr<ID3D12DescriptorHeap> getRTVheap();
+		UINT getFrameIndex();
+		UINT getDescriptorHeapSize();
+		std::shared_ptr<RTX_Pipeline> getPipeline();
+		ComPtr<ID3D12StateObject> getRTStateObject();
 
 		/*SETTERS*/
 		void setViewPortHeight(int _height);

@@ -80,6 +80,51 @@ ComPtr<ID3D12StateObjectProperties> RTX_Initializer::getRTStateObjProperties()
 	return rtStateObjectProps;
 }
 
+ComPtr<ID3D12RootSignature> RTX_Initializer::getRootSignature()
+{
+	return rootSignature;
+}
+
+CD3DX12_VIEWPORT RTX_Initializer::getViewPort()
+{
+	return viewPort;
+}
+
+CD3DX12_RECT RTX_Initializer::getScissorRect()
+{
+	return scissorRect;
+}
+
+ComPtr<ID3D12Resource> RTX_Initializer::getRenderTarget()
+{
+	return renderTargets[frameIndex];
+}
+
+ComPtr<ID3D12DescriptorHeap> RTX_Initializer::getRTVheap()
+{
+	return rtvHeap;
+}
+
+UINT RTX_Initializer::getFrameIndex()
+{
+	return frameIndex;
+}
+
+UINT RTX_Initializer::getDescriptorHeapSize()
+{
+	return descriptorHeapSize;
+}
+
+std::shared_ptr<RTX_Pipeline> RTX_Initializer::getPipeline()
+{
+	return pipeline;
+}
+
+ComPtr<ID3D12StateObject> RTX_Initializer::getRTStateObject()
+{
+	return rtStateObject;
+}
+
 #pragma region RTX_SUPPORT_CHECK
 	int RTX_Initializer::createDevice()
 	{
@@ -296,7 +341,7 @@ ComPtr<ID3D12StateObjectProperties> RTX_Initializer::getRTStateObjProperties()
 	{
 		HRESULT hr; // Error handling
 		// Set up hierarchy.
-		std::shared_ptr<RTX_Pipeline> pipeline = std::make_shared<RTX_Pipeline>();
+		pipeline = std::make_shared<RTX_Pipeline>();
 		pipeline->setRTXManager(rtxManager);
 
 		pipeline->createDefaultRootSignature();

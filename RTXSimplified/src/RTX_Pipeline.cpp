@@ -526,6 +526,18 @@ namespace RTXSimplified
 
 		return 0;
 	}
+	ComPtr<ID3D12DescriptorHeap> RTX_Pipeline::getSrvUavHeap()
+	{
+		return srvUavHeap;
+	}
+	RTX_SBTGenerator RTX_Pipeline::getSBTGenerator()
+	{
+		return SBTGenerator;
+	}
+	ComPtr<ID3D12Resource> RTX_Pipeline::getSBTStorage()
+	{
+		return sbtStorage;
+	}
 	void RTX_Pipeline::setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager)
 	{
 		rtxManager = _rtxManager;

@@ -3,9 +3,16 @@
 
 #include "d3dx12.h" // DirectX12 api
 #include <vector> // std::vectore
+#include "d3dx12.h" // DXR
+#include <d3d12.h> // DXR
+#include <dxgi1_4.h> // DXR
+#include <memory> // smart pointers
+#include <dxcapi.h> //DXR
 
 namespace RTXSimplified
 {
+	/*Forward declares*/
+	class RTX_Manager;
 	/**
 	*	\brief The class responsible for tracing the path of light rays.
 	* 	
@@ -13,12 +20,13 @@ namespace RTXSimplified
 	class RTX_PathTracer
 	{
 	private:
-		D3D12_DISPATCH_RAYS_DESC dispatchDescriptor; ///< Descriptor containing info about the raytracing task.
-		std::vector<ID3D12DescriptorHeap*> heaps; ///< Descriptor heap giving access to the top-level acceleration
-												  ///< structure, as well as the raytracing output.
+		std::shared_ptr<RTX_Manager> rtxManager; ///< Stores a reference to the RTX manager class.
+
 	public:
-		int traceRays(); ///< Traces the rays of light.
-		int createDescriptor(); ///< Creates the descriptor containing info about the RT task.
+		int populateCommandList(); ///< Populates the command list for execution.
+
+		/*SETTERS*/
+		void setRTXManager(std::shared_ptr<RTX_Manager> _rtxManager);
 	};
 }
 
