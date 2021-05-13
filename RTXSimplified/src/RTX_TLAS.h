@@ -26,7 +26,7 @@ namespace RTXSimplified
 		const DirectX::XMMATRIX& transformMat; ///< Transform matrix.
 		UINT instanceID; ///< Instance ID visisble in the shader.
 		UINT hitGroupIndex; ///< Hit group index to fetch the shaders from the shader binding table.
-	};
+	}; ///< Structure used to store an instance of the TLAS.
 	/**
 	*	\brief The class responsible for creating and managing the top level accelleration structure.
 	*/

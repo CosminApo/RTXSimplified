@@ -18,6 +18,7 @@
 
 namespace RTXSimplified
 {
+
 	/**
 	*	\brief The class responsible for creating and managing the bottom level accelleration structure.
 	*/
@@ -28,6 +29,7 @@ namespace RTXSimplified
 		UINT64 resultSize; ///< Stores the resulting size of the BLAS.
 		std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> vertexBuffers = {}; ///< Vertex buffer descriptors used to generate the AS.
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS flags; ///< Flags for the builder.
+
 
 		int addVertexBufferLimited(
 			ID3D12Resource* _vertexBuffer,		///< Contains vertex coords.

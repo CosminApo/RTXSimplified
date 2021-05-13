@@ -3,6 +3,7 @@
 #include "RTX_Manager.h"
 #include "RTX_BVHmanager.h"
 #include <fstream>
+#include <iostream>
 
 namespace RTXSimplified
 {
@@ -13,9 +14,17 @@ namespace RTXSimplified
 	}
 	int RTX_Pipeline::addRootSignatureAssociation()
 	{
+		/*Associate the shaders with its root signatures.*/
 		addRootSignatureAssociation(rayGenSignature.Get(), { L"RayGen" });
 		addRootSignatureAssociation(missSignature.Get(), { L"Miss" });
-		addRootSignatureAssociation(hitSignature.Get(), { L"Hit" });
+		addRootSignatureAssociation(hitSignature.Get(), { L"HitGroup" });
+
+		if (rtxManager->getShadowsEnabled())
+		{
+			addRootSignatureAssociation(shadowSignature.Get(), { L"ShadowHitGroup" });
+			addRootSignatureAssociation(missSignature.Get(), { L"Miss", L"ShadowMiss" });
+		}
+		addRootSignatureAssociation(hitSignature.Get(), { L"HitGroup", L"PlaneHitGroup" });
 		return 0;
 	}
 	int RTX_Pipeline::addRootSignatureAssociation(ID3D12RootSignature* _rootSig, const std::vector<std::wstring>& _symbols)
@@ -54,7 +63,7 @@ namespace RTXSimplified
 		bufferDesc.Width = _size;									// how long the memory block is
 
 		ID3D12Resource* buffer;
-		hr = rtxManager->getInitializer()->getRTXDevice().Get()->CreateCommittedResource( //Creates both a resource and an implicit heap and the resource is mapped to the heap
+		hr = _device->CreateCommittedResource( //Creates both a resource and an implicit heap and the resource is mapped to the heap
 			&_heapProps,					// D3D12_HEAP_PROPERTIES for the heap
 			D3D12_HEAP_FLAG_NONE,			// D3D12_HEAP_FLAGS for the heap
 			&bufferDesc,					// descriptor for buffer
@@ -68,7 +77,7 @@ namespace RTXSimplified
 	}
 	int RTX_Pipeline::buildShaderExportList(std::vector<std::wstring>& _exportedSymbols)
 	{
-		std::unordered_set<std::wstring> exports; // Stores all the names from libs and hjitgroups
+		std::unordered_set<std::wstring> exports; // Stores all the names from libs and hitgroups
 		
 		/* Add all the libs */
 		for (const Library& lib : libraries)
@@ -79,7 +88,7 @@ namespace RTXSimplified
 			}
 		}
 
-		/* Add al the hitgroups. Note empty symbols first. */
+		/* Add all the hitgroups. Note empty symbols first. */
 		for (const auto& hitGroup : hitgroups)
 		{
 			if (!hitGroup.anyHitSymbol.empty())
@@ -155,7 +164,6 @@ namespace RTXSimplified
 		RTX_Exception::handleError(&hr, "Error creating the local root signature"); //Error handling
 
 		serializedRootSignature->Release(); // Empty blob
-		error->Release(); // Empty blob
 
 		return 0;
 	}
@@ -174,9 +182,9 @@ namespace RTXSimplified
 		if (!library) // Only do this if library has not been created yet.
 		{
 			hr = DxcCreateInstance(			// Create a new instance
-				CLSID_DxcCompiler,			// of type library
-				__uuidof(IDxcCompiler),		// based on this data type
-				(void**)&compiler			// store the result here
+				CLSID_DxcLibrary,			// of type library
+				__uuidof(IDxcLibrary),		// based on this data type
+				(void**)&library			// store the result here
 			);
 			RTX_Exception::handleError(&hr, "Error creating the shader library."); // Error handling
 		}
@@ -185,18 +193,15 @@ namespace RTXSimplified
 			hr = library->CreateIncludeHandler(&includeHandler); // Create the handler based on the library.
 			RTX_Exception::handleError(&hr, "Error creating the shader handler."); // Error handling
 		}
-
-		std::ifstream file(_shaderFile); // Open the file
-		std::string line = "";
-		std::string shader = "";
-		if (!file.is_open()) // Error handle
+		// Open and read the file
+		std::ifstream shaderFile(_shaderFile);
+		if (shaderFile.good() == false)
 		{
 			RTX_Exception::handleError("Error opening the shader file: " + _shaderFile, true);
 		}
-		while (std::getline(file, line)) // Read the file in
-		{
-			shader = shader + line;
-		}
+		std::stringstream strStream;
+		strStream << shaderFile.rdbuf();
+		std::string shader = strStream.str();
 
 		IDxcBlobEncoding* textBlob;	// String needs to be converted to blob for compiling.
 		hr = library->CreateBlobWithEncodingFromPinned( // Create a new blob from the string.
@@ -217,7 +222,7 @@ namespace RTXSimplified
 			textBlob,			// using this blob
 			lpcwstrFilename,	// and this file name
 			L"",				// from the start
-			L"Lib_6_3",			// this profile
+			L"lib_6_3",			// this profile
 			nullptr,			// no arguments
 			0,					// no arguments
 			nullptr,			// no defines
@@ -227,14 +232,44 @@ namespace RTXSimplified
 		);
 		RTX_Exception::handleError(&hr, "Error compiling shader"); // Error handling
 
+		// Verify the result
+		HRESULT resultCode;
+		hr = result->GetStatus(&resultCode);
+		RTX_Exception::handleError(&hr, "Error compiling shader source code"); // Error handling
+		if (FAILED(resultCode))
+		{
+			IDxcBlobEncoding* error;
+			hr = result->GetErrorBuffer(&error);
+			if (FAILED(hr))
+			{
+				throw std::logic_error("Failed to get shader compiler error");
+			}
+
+			// Convert error blob to a string
+			std::vector<char> infoLog(error->GetBufferSize() + 1);
+			memcpy(infoLog.data(), error->GetBufferPointer(), error->GetBufferSize());
+			infoLog[error->GetBufferSize()] = 0;
+
+			std::string errorMsg = "Shader Compiler Error:\n";
+			errorMsg.append(infoLog.data());
+
+			MessageBoxA(nullptr, errorMsg.c_str(), "Error!", MB_OK);
+			throw std::logic_error("Failed compile shader");
+		}
+
 		// Copy the result in a standard blob to return.
 		IDxcBlob* rtnBlob; 
-		result->GetResult(&rtnBlob);
+		hr = result->GetResult(&rtnBlob);
+		RTX_Exception::handleError(&hr, "Error finalizing shader"); // Error handling
+
+		std::cout << rtnBlob->GetBufferSize();
+
 		return rtnBlob;
 	}
 
 	std::wstring RTX_Pipeline::stringToWstring(std::string _s)
 	{
+		// Helper function to convert strings to wstring. Wstring is better for windows stuff cause unicode.
 		int len;
 		int slength = (int)_s.length() + 1;
 		len = MultiByteToWideChar(CP_ACP, 0, _s.c_str(), slength, 0, 0);
@@ -269,7 +304,14 @@ namespace RTXSimplified
 					0, // implicit register space 0
 					D3D12_DESCRIPTOR_RANGE_TYPE_SRV, // TLAS
 					1 // slot 1 for TLAs
-				}
+				},
+				{	
+					0,	//0
+					1,	// descriptor
+					0,	// register space 0
+					D3D12_DESCRIPTOR_RANGE_TYPE_CBV, // camera
+					2	// slot 2 for cbv
+				} 
 			}
 		);
 		return rootSignatureGen->generate(rtxManager->getInitializer()->getRTXDevice().Get(), true); // Create a new root signature
@@ -287,30 +329,59 @@ namespace RTXSimplified
 	{
 		std::shared_ptr<RootSignatureGenerator> rootSignatureGen; ///< Generators for root signatures for the shaders.
 		rootSignatureGen = std::make_shared<RootSignatureGenerator>();
+		rootSignatureGen->addRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 0);
 		rootSignatureGen->addRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV);
+		if (rtxManager->getShadowsEnabled())
+		{
+			// Add a single range pointing to the TLAS in the heap
+			rootSignatureGen->addHeapRangesParameter({ {
+					2 /*t2*/,
+					1,
+					0,
+					D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+					1 /*2nd slot of the heap*/ },
+				});
+		}
+
 		return rootSignatureGen->generate(rtxManager->getInitializer()->getRTXDevice().Get(), true); // Create a new root signature
 	}
 
 	int RTX_Pipeline::createShaderLibraries()
 	{
+		/*Creates the shader lib for each shader*/
 		rayGenLibrary = compileShaderLib(rtxManager->getRayGenShader());
 		missLibrary = compileShaderLib(rtxManager->getMissShader());
 		hitLibrary = compileShaderLib(rtxManager->getHitShader());
+
+		if (rtxManager->getShadowsEnabled())
+		{
+			shadowLibrary = compileShaderLib(rtxManager->getShadowShader());
+		}
 		return 0;
 	}
 	int RTX_Pipeline::addLibraries()
 	{
-		/*Add the RayGen, Miss, Hit libraries*/
+		/*Add the shader libraries*/
 		addLibrary(rayGenLibrary.Get(), { L"RayGen" });
 		addLibrary(missLibrary.Get(), { L"Miss" });
-		addLibrary(hitLibrary.Get(), { L"Hit" });
+		addLibrary(hitLibrary.Get(), { L"ClosestHit", L"PlaneClosestHit" });
+		if (rtxManager->getShadowsEnabled())
+		{
+			addLibrary(shadowLibrary.Get(), { L"ShadowClosestHit", L"ShadowMiss" });
+		}
+
 		return 0;
 	}
 	int RTX_Pipeline::createShaderSignatures()
 	{
-		createRayGenSignature();
-		createMissSignature();
-		createHitSignature();
+		// Creats the shader signatures
+		rayGenSignature = createRayGenSignature();
+		missSignature =	createMissSignature();
+		hitSignature = createHitSignature();
+		if (rtxManager->getShadowsEnabled())
+		{
+			shadowSignature = createHitSignature();
+		}
 		return 0;
 	}
 	ID3D12StateObject* RTX_Pipeline::generate()
@@ -336,8 +407,7 @@ namespace RTXSimplified
 			libSubOjbect.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY; // Set it to lib type
 			libSubOjbect.pDesc = &lib.libDesc; // Copy the descriptor
 
-			subObjects[currentIndex] = libSubOjbect; // Add it to the list
-			currentIndex++;
+			subObjects[currentIndex++] = libSubOjbect; // Add it to the list
 		}
 
 		for (const HitGroup& group : hitgroups) // add all hitgroups
@@ -346,8 +416,7 @@ namespace RTXSimplified
 			hitSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP; // Set it to hit group type
 			hitSubObject.pDesc = &group.desc; // Copy the descriptor
 
-			subObjects[currentIndex] = hitSubObject; // Add it to the list
-			currentIndex++;
+			subObjects[currentIndex++] = hitSubObject; // Add it to the list
 		}
 
 		/* Create a shader descriptor with the data passed in earlier.*/
@@ -359,8 +428,8 @@ namespace RTXSimplified
 		D3D12_STATE_SUBOBJECT shaderConfigObject = {};
 		shaderConfigObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
 		shaderConfigObject.pDesc = &shaderDesc;
-		subObjects[currentIndex] = shaderConfigObject;
-		currentIndex++;
+		subObjects[currentIndex++] = shaderConfigObject;
+	
 
 		/* Build a list of symbols */
 		std::vector<std::wstring> exportedSymbols = {};
@@ -387,8 +456,8 @@ namespace RTXSimplified
 		D3D12_STATE_SUBOBJECT shaderPayloadAssociationObject = {};
 		shaderPayloadAssociationObject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
 		shaderPayloadAssociationObject.pDesc = &shaderPayloadAssociation;
-		subObjects[currentIndex] = shaderPayloadAssociationObject;
-		currentIndex++;
+		subObjects[currentIndex++] = shaderPayloadAssociationObject;
+
 
 		/* Add the root association objects */
 		for (RootSignatureAssociation& assoc : rootSigAssociations)
@@ -397,8 +466,8 @@ namespace RTXSimplified
 			D3D12_STATE_SUBOBJECT rootSigSubobj = {};
 			rootSigSubobj.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 			rootSigSubobj.pDesc = &assoc.rootSignature;
-			subObjects[currentIndex] = rootSigSubobj;
-			currentIndex++;
+			subObjects[currentIndex++] = rootSigSubobj;
+	
 
 			// Copy more data in for the association
 			assoc.association.NumExports = static_cast<UINT>(assoc.symbolPointers.size());
@@ -410,8 +479,8 @@ namespace RTXSimplified
 			rootSigAssocSubobj.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
 			rootSigAssocSubobj.pDesc = &assoc.association;
 
-			subObjects[currentIndex] = rootSigAssocSubobj;
-			currentIndex++;
+			subObjects[currentIndex++] = rootSigAssocSubobj;
+
 		}
 
 		/* Add a global and local empty signature */
@@ -419,16 +488,15 @@ namespace RTXSimplified
 		emptyGlobalRootSig.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
 		ID3D12RootSignature* dgSig = defaultGlobalSignature;
 		emptyGlobalRootSig.pDesc = &dgSig;
-		subObjects[currentIndex] = emptyGlobalRootSig;
-		currentIndex++;
+		subObjects[currentIndex++] = emptyGlobalRootSig;
+
 
 
 		D3D12_STATE_SUBOBJECT emptyLocalRootSig;
 		emptyLocalRootSig.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 		ID3D12RootSignature* dlSig = defaultLocalSignature;
 		emptyLocalRootSig.pDesc = &dlSig;
-		subObjects[currentIndex] = emptyLocalRootSig;
-		currentIndex++;
+		subObjects[currentIndex++] = emptyLocalRootSig;
 
 		/* Add a subobject for the pipeline config */
 		D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
@@ -436,8 +504,8 @@ namespace RTXSimplified
 		D3D12_STATE_SUBOBJECT pipelineConfigObject = {};
 		pipelineConfigObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
 		pipelineConfigObject.pDesc = &pipelineConfig;
-		subObjects[currentIndex] = pipelineConfigObject;
-		currentIndex++;
+		subObjects[currentIndex++] = pipelineConfigObject;
+
 
 		/* Create a pipeline desc */
 		D3D12_STATE_OBJECT_DESC pipelineDesc = {};
@@ -450,14 +518,14 @@ namespace RTXSimplified
 		// Create the pipeline
 		hr = rtxManager->getInitializer()->getRTXDevice()->CreateStateObject(&pipelineDesc, IID_PPV_ARGS(&rtStateObject)); 
 
-		RTX_Exception::handleError(&hr, " Error creating the raytracing pipeline.");
+		RTX_Exception::handleError(&hr, " Error creating the raytracing state object."); // Error handling
 
 		return rtStateObject;
 	}
 	int RTX_Pipeline::createShaderResourceHeap()
 	{
 		srvUavHeap = createDescriptorHeap(				// Create new descriptor heaps
-			2,											// 2 of them
+			3,											// 2 of them
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,		// type SRV/UAV/CBV
 			true										// visible
 		);
@@ -486,7 +554,13 @@ namespace RTXSimplified
 			rtxManager->getBVHManager()->getTLASBuffers().result->GetGPUVirtualAddress();
 		
 		rtxManager->getInitializer()->getRTXDevice()->CreateShaderResourceView(nullptr, &srvDesc, srvHandle); // Create the SRV
-
+		
+		srvHandle.ptr += rtxManager->getInitializer()->getRTXDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		// Describe and create a constant buffer view for the camera
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = rtxManager->getInitializer()->getCameraBuffer()->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = rtxManager->getInitializer()->getCameraBufferSize();
+		rtxManager->getInitializer()->getRTXDevice()->CreateConstantBufferView(&cbvDesc, srvHandle);
 		return 0;
 	}
 	int RTX_Pipeline::createShaderBindingTable()
@@ -500,12 +574,31 @@ namespace RTXSimplified
 		auto heapPointer = reinterpret_cast<UINT64*>(srvUavHeapHandle.ptr);
 
 		// Add the ray gen program with its data.
-		SBTGenerator.addRayGenerationProgram(L"Raygen", { heapPointer });
+		SBTGenerator.addRayGenerationProgram(L"RayGen", { heapPointer });
 
 		// Add the miss and hit program which use no data.
 		SBTGenerator.addMissProgram(L"Miss", {});
-		SBTGenerator.addRayGenerationProgram(L"HitGroup", { (void*)(rtxManager->getInitializer()->getVertexBuffer()->GetGPUVirtualAddress()) });
+		if (rtxManager->getShadowsEnabled())
+		{
+			SBTGenerator.addMissProgram(L"ShadowMiss", {});
+		}
+		for (int i = 0; i < 3; ++i) {
+			SBTGenerator.addHitProgram(L"HitGroup", { (void*)(rtxManager->getInitializer()->getInstanceBuffers()[i]->GetGPUVirtualAddress()) });
+			if (rtxManager->getShadowsEnabled())
+			{
+				SBTGenerator.addHitProgram(L"ShadowHitGroup", {});
+			}
+		}
 
+		if (rtxManager->getShadowsEnabled())
+		{
+			SBTGenerator.addHitProgram(L"PlaneHitGroup", { (void*)(rtxManager->getInitializer()->getInstanceBuffers()[0]->GetGPUVirtualAddress()), heapPointer });
+			SBTGenerator.addHitProgram(L"ShadowHitGroup", {});
+		}
+		else
+		{
+			SBTGenerator.addHitProgram(L"PlaneHitGroup", {});
+		}
 		// Calculate the size
 		uint32_t sbtsize = SBTGenerator.computeSBTSize();
 
@@ -517,7 +610,7 @@ namespace RTXSimplified
 			uploadHeapProperties								// upload heap properties
 		);
 
-		if (!sbtStorage)
+		if (!sbtStorage) // Error handling
 		{
 			RTX_Exception::handleError("Error allocating the SBT.", true);
 		}
@@ -558,7 +651,7 @@ namespace RTXSimplified
 		: lib(_lib), symbols(_symbols), exports(_symbols.size())
 	{
 		// New descriptor for each symbol
-		for (size_t i = 0; i < exports.size(); i++)
+		for (size_t i = 0; i < symbols.size(); i++)
 		{
 			exports[i] = {};							// init
 			exports[i].Name = symbols[i].c_str();		// set name to symbol
@@ -567,14 +660,10 @@ namespace RTXSimplified
 		}
 
 		// Creat a lib descriptor
-		libDesc.DXILLibrary.BytecodeLength = lib->GetBufferSize();
-		libDesc.DXILLibrary.pShaderBytecode = lib->GetBufferPointer();
+		libDesc.DXILLibrary.BytecodeLength = _lib->GetBufferSize();
+		libDesc.DXILLibrary.pShaderBytecode = _lib->GetBufferPointer();
 		libDesc.NumExports = static_cast<UINT>(symbols.size());
 		libDesc.pExports = exports.data();
-	}
-	RTX_Pipeline::Library::Library(const Library& _source)
-		: Library(_source.lib, _source.symbols)
-	{
 	}
 	int RTX_Pipeline::RootSignatureGenerator::addHeapRangesParameter(const std::vector<D3D12_DESCRIPTOR_RANGE>& _ranges)
 	{

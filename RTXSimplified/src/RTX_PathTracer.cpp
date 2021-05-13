@@ -7,11 +7,12 @@ namespace RTXSimplified
 {
 	int RTX_PathTracer::populateCommandList()
 	{
+		HRESULT hr2;
 		// Reset the allocator
-		rtxManager->getInitializer()->getCommandAllocator()->Reset();
+		hr2 = rtxManager->getInitializer()->getCommandAllocator()->Reset();
 
 		// Reset the command list
-		rtxManager->getInitializer()->getCommandList()->Reset(
+		hr2 = rtxManager->getInitializer()->getCommandList()->Reset(
 			rtxManager->getInitializer()->getCommandAllocator().Get(), rtxManager->getInitializer()->getPipelineState().Get());
 
 		// Set states
@@ -45,6 +46,9 @@ namespace RTXSimplified
 			1, &rtvHandle, false, nullptr
 		);
 
+		rtxManager->getBVHManager()->updateTLAS();
+
+
 		// Bind heaps
 		std::vector<ID3D12DescriptorHeap*> heaps = { rtxManager->getInitializer()->getPipeline()->getSrvUavHeap().Get() };
 		rtxManager->getInitializer()->getCommandList()->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
@@ -75,11 +79,12 @@ namespace RTXSimplified
 			rayGenerationSectionSize +
 			missSectionSize;
 		desc.HitGroupTable.SizeInBytes = hitGroupsSectionSize;
-		desc.HitGroupTable.StrideInBytes = rtxManager->getInitializer()->getPipeline()->getSBTGenerator().getHitGroupSectionSize();
+		desc.HitGroupTable.StrideInBytes = rtxManager->getInitializer()->getPipeline()->getSBTGenerator().getHitGroupEntrySize();
 
 		// set width and height
 		desc.Width = rtxManager->getWidth();
 		desc.Height = rtxManager->getHeight();
+		desc.Depth = 1;
 
 		// Bind RT pipeline
 		rtxManager->getInitializer()->getCommandList()->SetPipelineState1(rtxManager->getInitializer()->getRTStateObject().Get());
@@ -120,7 +125,8 @@ namespace RTXSimplified
 		);
 
 		// Close command list
-		rtxManager->getInitializer()->getCommandList()->Close();
+		HRESULT hr = rtxManager->getInitializer()->getCommandList()->Close();
+		RTX_Exception::handleError(&hr, "Error closing command list.");
 
 
 		return 0;

@@ -24,9 +24,12 @@ namespace RTXSimplified
 	uint32_t RTX_SBTGenerator::copyShaderData(ID3D12StateObjectProperties* _RTPipeline, uint8_t* _outputData, const std::vector<SBTEntry>& _shaders, uint32_t _entrySize)
 	{
 		uint8_t* data = _outputData;
-		for (const auto& shader : _shaders)
+		for (const auto& shader : _shaders)	// For each shader
 		{
-			void* id = _RTPipeline->GetShaderIdentifier(shader.entryPoint.c_str()); // Get the ID
+			std::wstring tmp = shader.entryPoint;
+			LPCWSTR name = tmp.c_str();
+
+			void* id = _RTPipeline->GetShaderIdentifier(name); // Get the ID
 			if (!id) // Error check 
 			{
 				RTX_Exception::handleError("Unknown shader identifier.", true);
@@ -97,7 +100,6 @@ namespace RTXSimplified
 		offset = copyShaderData(_raytracingPipeline, data, miss, missEntrySize);
 		data += offset;
 		offset = copyShaderData(_raytracingPipeline, data, hit, hitEntrySize);
-		data += offset;
 
 		// Unmap the sbt
 		_sbtBuffer->Unmap(0, nullptr);

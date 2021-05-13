@@ -27,6 +27,7 @@ namespace RTXSimplified
 			_vertexBuffer->GetGPUVirtualAddress() + _vertexOffsetInBytes;	
 		descriptor.Triangles.VertexBuffer.StrideInBytes = _vertexSizeInBytes;				// set the size of each vertex
 		descriptor.Triangles.VertexCount = _vertexCount;									// set the number of vertices
+		descriptor.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 		descriptor.Triangles.IndexBuffer =													// get the start of the index buffer, if it exists
 			_indexBuffer ? (_indexBuffer->GetGPUVirtualAddress() + _indexOffsetInBytes)
 			: 0;
@@ -86,8 +87,8 @@ namespace RTXSimplified
 	)
 	{
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS localFlags = flags; // Use the flags generated before to check if update or construct.
-		if (flags == D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE && _updateOnly)
-			flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+		if (localFlags == D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE && _updateOnly)
+			localFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
 
 		/*ERROR CHECKS*/
 		// Check you're not trying to update on a non-updateable struct
@@ -111,9 +112,9 @@ namespace RTXSimplified
 		buildDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;							// Array layout
 		buildDesc.Inputs.NumDescs = static_cast<UINT>(vertexBuffers.size());				// number of descs based on vertex buffers amount
 		buildDesc.Inputs.pGeometryDescs = vertexBuffers.data();								// define the geometry
-		buildDesc.Inputs.Flags = flags;														// using the flags generated before
+		buildDesc.Inputs.Flags = localFlags;												// using the flags generated before
 		buildDesc.DestAccelerationStructureData = _resultBuffer->GetGPUVirtualAddress();	// get result buffer
-		buildDesc.SourceAccelerationStructureData = _scratchBuffer->GetGPUVirtualAddress();	// get scratch buffer
+		buildDesc.ScratchAccelerationStructureData = _scratchBuffer->GetGPUVirtualAddress();	// get scratch buffer
 		buildDesc.SourceAccelerationStructureData = _previousResult ? _previousResult->GetGPUVirtualAddress() : 0; // get previous BLAS if available
 
 		_commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr); // Build the AS

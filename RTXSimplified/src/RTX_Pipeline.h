@@ -14,7 +14,7 @@
 #include <tuple> // root sig
 #include <xhash> // shader export list
 #include "RTX_SBTGenerator.h" // SBTs 
-
+#include <sstream> // file io
 
 using Microsoft::WRL::ComPtr; ///< Smart pointer for interfaces
 
@@ -38,10 +38,9 @@ namespace RTXSimplified
 		struct Library
 		{
 			Library(IDxcBlob* _lib, const std::vector<std::wstring>& _symbols); ///< Generates a new library.
-			Library(const Library& _source);	///< Constructor used to avoid scope errors.
 
 			IDxcBlob* lib;	///< Stores the library.
-			const std::vector<std::wstring>& symbols; ///< Stores the exported symbols.
+			std::vector<std::wstring> symbols; ///< Stores the exported symbols.
 			std::vector<D3D12_EXPORT_DESC> exports;	///< Storest the exports.
 			D3D12_DXIL_LIBRARY_DESC libDesc; ///< Stores the library descriptors.
 		}; ///< Struct used to store the libraries.
@@ -67,7 +66,6 @@ namespace RTXSimplified
 			std::vector<std::vector<D3D12_DESCRIPTOR_RANGE>> ranges; ///< Heap range descriptors.
 			std::vector<D3D12_ROOT_PARAMETER> parameters; ///< Root parameters descriptors.
 			std::vector<UINT> rangeLocations;	///< Range array in ranges.
-
 			enum
 			{
 				RSC_BASE_SHADER_REGISTER = 0,
@@ -81,7 +79,7 @@ namespace RTXSimplified
 		struct HitGroup
 		{
 
-			HitGroup(std::wstring _hitGroupName, std::wstring _closestHit, std::wstring _anyHit = L"", std::wstring _intersection = L"");
+			HitGroup(std::wstring _hitGroupName, std::wstring _closestHit, std::wstring _anyHit = L"", std::wstring _intersection = L""); ///< Adds a new hit group.
 			HitGroup(const HitGroup& _source);
 
 			std::wstring hitGroupName;		///< Stores the name of the hit group.
@@ -93,14 +91,14 @@ namespace RTXSimplified
 
 		struct RootSignatureAssociation
 		{
-			RootSignatureAssociation(ID3D12RootSignature* _rootSig, const std::vector<std::wstring>& _symbols);
+			RootSignatureAssociation(ID3D12RootSignature* _rootSig, const std::vector<std::wstring>& _symbols); ///< Adds a new root signature association.
 			RootSignatureAssociation(const RootSignatureAssociation& _source);
 
-			ID3D12RootSignature* rootSignature;		
-			ID3D12RootSignature* rootSignaturePointer;
-			std::vector<std::wstring> symbols;
-			std::vector<LPCWSTR> symbolPointers;
-			D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association = {};
+			ID3D12RootSignature* rootSignature;	///< Stores the root signature.
+			ID3D12RootSignature* rootSignaturePointer;	///< Stores pointer to it.
+			std::vector<std::wstring> symbols;	///< Stores the symbols.
+			std::vector<LPCWSTR> symbolPointers; ///< Store the pointer to it.
+			D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association = {}; ///< Stores the association/
 		}; ///< Struct for associating shaders with root signatures.
 		
 		UINT maxAttributeSizeInBytes = 0; ///< Max space for attributes.
@@ -115,18 +113,19 @@ namespace RTXSimplified
 		ComPtr<IDxcBlob> rayGenLibrary; ///< Stores the ray generation shader library.
 		ComPtr<IDxcBlob> hitLibrary;	///< Stores the hit shader library.
 		ComPtr<IDxcBlob> missLibrary;	///< Stores the miss shader library.
+		ComPtr<IDxcBlob> shadowLibrary;	///< Stores the shadow shader library.
 		ID3D12RootSignature* defaultGlobalSignature; ///< Stores the default empty global signature.
 		ID3D12RootSignature* defaultLocalSignature; ///< Stores the default empty local signature.
 		std::shared_ptr<RTX_Manager> rtxManager; ///< Stores a reference to the RTX manager class.
 		ComPtr<ID3D12RootSignature> rayGenSignature; ///< Signature for the ray generation shader.
 		ComPtr<ID3D12RootSignature> hitSignature; ///< Signature for the hit shader.
 		ComPtr<ID3D12RootSignature> missSignature; ///< Signature for the miss shader.
+		ComPtr<ID3D12RootSignature> shadowSignature; ///< Signature for the shadow shader.
 		ComPtr<ID3D12DescriptorHeap> srvUavHeap; ///< Stores the descriptor for the srv/uav/cbv heap.
 		RTX_SBTGenerator SBTGenerator; ///< Helps generate SBTs.
 		ComPtr<ID3D12Resource> sbtStorage; ///< Stores the SBT.
 
 		IDxcBlob* compileShaderLib(std::string _shaderFile); ///< Compiles the shader library.
-		std::wstring stringToWstring(std::string _s); ///< Converts an std::string to a std::wstring.
 		void addLibrary(IDxcBlob* _library, const std::vector<std::wstring>& _symbols); ///< Adds a library to the pipeline. 
 		ComPtr<ID3D12RootSignature> createRayGenSignature(); ///< Creates the signature for the ray generation shader.
 		ComPtr<ID3D12RootSignature> createMissSignature(); ///< Creates the signature for the ray miss shader.
@@ -141,10 +140,13 @@ namespace RTXSimplified
 			D3D12_DESCRIPTOR_HEAP_TYPE _type, ///< Type of descriptors.
 			bool _shaderVisible ///< Is the shader visibe.
 		); ///< Creates a new shader descriptor heap.
-		ID3D12Resource* createBuffer(ID3D12Device* _device, uint64_t _size, D3D12_RESOURCE_FLAGS _flags,
-			D3D12_RESOURCE_STATES _initState, const D3D12_HEAP_PROPERTIES& _heapProps); ///< Creates a buffer based on the device properties, data properties and ctrl flags.
+		
 
 	public:
+		ID3D12Resource* createBuffer(ID3D12Device* _device, uint64_t _size, D3D12_RESOURCE_FLAGS _flags,
+			D3D12_RESOURCE_STATES _initState, const D3D12_HEAP_PROPERTIES& _heapProps); ///< Creates a buffer based on the device properties, data properties and ctrl flags.
+		std::wstring stringToWstring(std::string _s); ///< Converts an std::string to a std::wstring.
+
 		int addHitGroup(
 			const std::wstring& _hitGroupName, ///< Name of the hit group.
 			const std::wstring& _closestHitSymbol, ///< Symbol for the closest hit.

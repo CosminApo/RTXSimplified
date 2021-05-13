@@ -29,18 +29,18 @@ namespace RTXSimplified
 			/* Make a descriptor */
 			instanceDescs[i].InstanceID = instances[i].instanceID; // Copy the iID
 			instanceDescs[i].InstanceContributionToHitGroupIndex = instances[i].hitGroupIndex; // Copy the gID
-			instanceDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE; // Use default flags
+			instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE; // Use default flags
 			DirectX::XMMATRIX matrix = DirectX::XMMatrixTranspose(instances[i].transformMat); // Needs to be transposed cause GLM and instance desc mats are different.
 			memcpy(instanceDescs[i].Transform, &matrix, sizeof(instanceDescs[i].Transform)); // Copy the matrix
 			instanceDescs[i].AccelerationStructure = instances[i].bottomLevelAS->GetGPUVirtualAddress(); // Copy BLAS.
-			instanceDescs[i].InstanceMask = 255; // Default always visible value
+			instanceDescs[i].InstanceMask = 0xFF; // Default always visible value
 		}
 
 		_descriptorBuffer->Unmap(0, nullptr);
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS localFlags = flags; // Use the flags generated before to check if update or construct.
-		if (flags == D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE && _updateOnly)
-			flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+		if (localFlags == D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE && _updateOnly)
+			localFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
 
 		/*ERROR CHECKS*/
 		// Check you're not trying to update on a non-updateable struct
@@ -54,20 +54,20 @@ namespace RTXSimplified
 			RTX_Exception::handleError("Trying to update a TLAS but no previous TLAS provided.", true);
 		}
 		// Check if scratch, result and descriptor size have been populated
-		if (resultSize == 0 || scratchSize == 0 || descriptorSize)
+		if (resultSize == 0 || scratchSize == 0 || descriptorSize == 0)
 		{
 			RTX_Exception::handleError("Invalid result / scratch / descriptor size.", true);
 		}
 
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc;						// Descriptor storing info about the TLAS
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};						// Descriptor storing info about the TLAS
 		buildDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;	    // TLAS type
 		buildDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;							// Array layout
 		buildDesc.Inputs.NumDescs = instanceCount;											// number of descs based on vertex buffers amount
 		buildDesc.Inputs.InstanceDescs = _descriptorBuffer->GetGPUVirtualAddress(); 		// define the descriptors
-		buildDesc.Inputs.Flags = flags;														// using the flags generated before
+		buildDesc.Inputs.Flags = localFlags;														// using the flags generated before
 		buildDesc.DestAccelerationStructureData = _resultBuffer->GetGPUVirtualAddress();	// get result buffer
 		buildDesc.ScratchAccelerationStructureData = _scratchBuffer->GetGPUVirtualAddress();// get scratch buffer
-		buildDesc.SourceAccelerationStructureData = _previousResult ? _previousResult->GetGPUVirtualAddress() : 0; // get previous BLAS if available
+		buildDesc.SourceAccelerationStructureData = _updateOnly ? _previousResult->GetGPUVirtualAddress() : 0; // get previous BLAS if available
 
 		_commandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr); // Build the AS
 

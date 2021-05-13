@@ -22,8 +22,8 @@ namespace RTXSimplified
 	{
 		SBTEntry(std::wstring _entrypoint, std::vector<void*> _inputData); ///< Create a new SBT entry.
 
-		const std::wstring entryPoint;
-		const std::vector<void*> inputData;
+		const std::wstring entryPoint; ///< Stores the entry point for the SBT.
+		const std::vector<void*> inputData; ///< Stores the data for the SBT.
 
 	}; ///< Helper struct for SBT entries.
 
